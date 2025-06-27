@@ -19,16 +19,12 @@ This is a counterpart of a Mac version available at https://github.com/gershnik/
 
 [^1]: sometimes called an IME but technically IME is a different older technology
 
-<!-- TOC depthfrom:2-->
-
 - [Features](#features)
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Uninstall](#uninstall)
 - [Mappings](#mappings)
 - [Building](#building)
-
-<!-- /TOC -->
 
 ## Features
 
@@ -67,7 +63,8 @@ This is a counterpart of a Mac version available at https://github.com/gershnik/
 
 ## Configuration
 
-When one of the Translit languages is active the system tray will have one additional icon and look like this:
+When one of the Translit languages is active the system tray will have one additional icon 
+(circled in red below):
 
 <img src="doc/images/SettingsIcon.png" width="100px"><br>
 
