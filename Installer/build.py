@@ -38,7 +38,7 @@ def build(command: str, config: str, arch: str, builddir:Path):
     major = macros.find('BuildMajorVersion', namespaces).text
     minor = macros.find('BuildMinorVersion', namespaces).text
     patch = macros.find('BuildPatchVersion', namespaces).text
-    print(f'maojor {major}, minor {minor}, patch {patch}', flush=True)
+    print(f'Version: {major}.{minor}.{patch}', flush=True)
 
     print('Building x86...\n==========\n', flush=True)
     subprocess.run([msbuild, SRCDIR / 'Translit.sln', 

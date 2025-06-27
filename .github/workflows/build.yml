@@ -1,0 +1,55 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: 
+      - '*'
+      - '*/**'
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - 'doc/**'
+      - '.gitignore'
+      - '.gitattributes'
+      - '.github/workflows/publish.yml'
+      
+
+jobs:
+  main:
+    runs-on: windows-latest
+    permissions: write-all
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Get Version
+      shell: bash
+      run: |
+        version=`python .tools/get-version.py`
+        echo Version: $version
+        echo "GH_BUILD_VERSION=$version" >> $GITHUB_ENV
+
+    - name: Fetch dependencies
+      shell: bash
+      run: ./fetch
+
+    - name: Build
+      shell: bash
+      run: |
+        python build.py
+
+    - name: Archive x64 artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Translit-x64.msi
+        path: build\Installers\Release\Translit-x64.msi
+        retention-days: 3
+
+    - name: Archive arm64 artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Translit-${{ env.GH_BUILD_VERSION }}-arm64.msi
+        path: build\Installers\Release\Translit-arm64.msi
+        retention-days: 3
