@@ -30,7 +30,10 @@ jobs:
         python-version: '3.13'
 
     - name: Install WiX
-      run: dotnet tool install --global wix
+      run: |
+        dotnet tool install --global wix
+        wix extension add -g WixToolset.Util.wixext
+        wix extension add -g WixToolset.UI.wixext
 
     - name: Get Version
       shell: bash
