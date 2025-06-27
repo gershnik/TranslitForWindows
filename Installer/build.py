@@ -5,6 +5,7 @@ import sys
 import argparse
 import subprocess
 import shutil
+import zipfile
 import xml.etree.ElementTree as ET
 
 from pathlib import Path
@@ -12,12 +13,20 @@ from pathlib import Path
 MYDIR = Path(__file__).parent
 SRCDIR = MYDIR.parent.absolute()
 
+def elementOrDie(el: ET.Element | None):
+    if el is None:
+        print('Malformed Version.props', file=sys.stderr)
+        sys.exit(1)
+    return el
+
 def build(command: str, config: str, arch: str, builddir:Path):
     msbuild = 'msbuild'
 
     intdir = builddir / "IntDir/Installer" / arch / config / 'wix'
     outdir = builddir / "Installers" / config
     msi = outdir / f"Translit-{arch.lower()}.msi"
+    wixpdb = msi.with_suffix('.wixpdb')
+    pdbzip = outdir / f"Translit-{arch.lower()}.pdb.zip"
 
     if command == 'clean' or command == 'rebuild':
         print('\nInstaller: Cleaning\n', flush=True)
@@ -26,7 +35,8 @@ def build(command: str, config: str, arch: str, builddir:Path):
             print(f'Unable to remove {intdir}', file=sys.stderr)
             return 1
         msi.unlink(missing_ok=True)
-        msi.with_suffix('.wixpdb').unlink(missing_ok=True)
+        wixpdb.unlink(missing_ok=True)
+        pdbzip.unlink(missing_ok=True)
         print('\n', flush=True)
     
     if command == 'clean':
@@ -34,24 +44,22 @@ def build(command: str, config: str, arch: str, builddir:Path):
     
     props = ET.parse(SRCDIR / 'Version.props')
     namespaces = {'': 'http://schemas.microsoft.com/developer/msbuild/2003'}
-    macros = props.find('./PropertyGroup[@Label="UserMacros"]', namespaces)
-    major = macros.find('BuildMajorVersion', namespaces).text
-    minor = macros.find('BuildMinorVersion', namespaces).text
-    patch = macros.find('BuildPatchVersion', namespaces).text
+    macros = elementOrDie(props.find('./PropertyGroup[@Label="UserMacros"]', namespaces))
+    major = elementOrDie(macros.find('BuildMajorVersion', namespaces)).text
+    minor = elementOrDie(macros.find('BuildMinorVersion', namespaces)).text
+    patch = elementOrDie(macros.find('BuildPatchVersion', namespaces)).text
     print(f'Installer: Version: {major}.{minor}.{patch}', flush=True)
 
     print('Installer: Building x86\n', flush=True)
     subprocess.run([msbuild, SRCDIR / 'Translit.sln', 
                     '/t:Settings', '/p:Configuration=Release;Platform=x86',
                     '-v:m'], check=True)
-    print('\n', flush=True)
 
     
     print(f'Installer: Building {arch}\n', flush=True)
     subprocess.run([msbuild, SRCDIR / 'Translit.sln', 
                     '/t:Settings', f'/p:Configuration=Release;Platform={arch}',
                     '-v:m'], check=True)
-    print('\n', flush=True)
 
     print('Installer: Building MSI...', flush=True)
     subprocess.run(['wix', 'build',
@@ -67,12 +75,17 @@ def build(command: str, config: str, arch: str, builddir:Path):
         '-loc', 'Strings.wxl',
         '-out', msi,
         'Package.wxs'], check=True)
-    print('\n', flush=True)
 
     print('Installer: Validating MSI...', flush=True)
     subprocess.run(['wix', 'msi', 'validate', msi], check=True)
-    print('\n', flush=True)
 
+    print('Installer: Archiving PDBs...', flush=True)
+    with zipfile.ZipFile(pdbzip, 'w') as zip:
+        zip.write(builddir / "Out" / arch / config / 'Translit.pdb', arcname=f'{arch}/Translit.pdb')
+        zip.write(builddir / "Out" / arch / config / 'TranslitSettings.pdb', arcname=f'{arch}/TranslitSettings.pdb')
+        zip.write(builddir / "Out/Win32" / config / 'Translit.pdb', arcname='Win32/Translit.pdb')
+        zip.write(builddir / "Out/Win32" / config / 'TranslitSettings.pdb', arcname='Win32/TranslitSettings.pdb')
+        zip.write(wixpdb, arcname=wixpdb.name)
 
 def main():
     parser = argparse.ArgumentParser()

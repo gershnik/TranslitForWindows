@@ -1,0 +1,64 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+  push:
+      tags:
+        - 'v*'
+
+jobs:
+  main:
+    runs-on: windows-latest
+    permissions: write-all
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install WiX
+      run: |
+        dotnet tool install --global wix
+        wix extension add -g WixToolset.Util.wixext
+        wix extension add -g WixToolset.UI.wixext
+
+    - name: Get Version
+      shell: bash
+      run: |
+        version=`python .tools/get-version.py`
+        echo Version: $version
+        echo "GH_BUILD_VERSION=$version" >> $GITHUB_ENV
+
+    - name: Fetch dependencies
+      shell: bash
+      run: python fetch.py
+
+    - name: Build
+      shell: bash
+      run: |
+        python build.py
+        mv build/Installers/Release/Translit-x64.msi build/Installers/Release/Translit-${{ env.GH_BUILD_VERSION }}-x64.msi
+        mv build/Installers/Release/Translit-arm64.msi build/Installers/Release/Translit-${{ env.GH_BUILD_VERSION }}-arm64.msi
+        mv build/Installers/Release/Translit-x64.pdb.zip build/Installers/Release/Translit-${{ env.GH_BUILD_VERSION }}-x64.pdb.zip 
+        mv build/Installers/Release/Translit-arm64.pdb.zip build/Installers/Release/Translit-${{ env.GH_BUILD_VERSION }}-arm64.pdb.zip
+
+    - name: Upload Symbols
+      shell: bash
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        aws s3 cp build/Installers/Release/Translit-*.pdb.zip s3://translit-symbols/
+      
+    - name: Make release
+      uses: softprops/action-gh-release@v2
+      with:
+        draft: true
+        prerelease: false
+        name: ${{ env.GH_BUILD_VERSION }}
+        body: ...edit me...
+        files: build/Installers/Release/Translit-*.msi
