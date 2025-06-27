@@ -53,7 +53,7 @@ jobs:
     - name: Archive x64 artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Translit-x64.msi
+        name: Translit-${{ env.GH_BUILD_VERSION }}-x64.msi
         path: build\Installers\Release\Translit-x64.msi
         retention-days: 3
 
