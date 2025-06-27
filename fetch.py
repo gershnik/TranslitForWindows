@@ -44,8 +44,8 @@ components = {
         'generateVerFile': True
     },
     'muuid': {
-        'ver': '561a0f64488b5d2815633e03ade9d3321bd53b9a',
-        'url': 'https://github.com/gershnik/modern-uuid/archive/{ver}/{ver}.tar.gz',
+        'ver': '1.8',
+        'url': 'https://github.com/gershnik/modern-uuid/archive/refs/tags/v{ver}/v{ver}.tar.gz',
         'unpacker': {
             'type': 'tar',
             'strip': 1
@@ -55,8 +55,8 @@ components = {
         'generateVerFile': True
     },
     'sys_string': {
-        'ver': 'master',
-        'url': 'https://github.com/gershnik/sys_string/archive/refs/heads/{ver}/{ver}.tar.gz',
+        'ver': '3.4',
+        'url': 'https://github.com/gershnik/sys_string/archive/refs/tags/v{ver}/v{ver}.tar.gz',
         'unpacker': {
             'type': 'tar',
             'strip': 1
