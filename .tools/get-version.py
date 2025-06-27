@@ -4,12 +4,13 @@
 import sys
 import xml.etree.ElementTree as ET
 
+from typing import Optional
 from pathlib import Path
 
 MYDIR = Path(__file__).parent
 SRCDIR = MYDIR.parent.absolute()
 
-def elementOrDie(el: ET.Element | None):
+def elementOrDie(el: Optional[ET.Element]):
     if el is None:
         print('Malformed Version.props', file=sys.stderr)
         sys.exit(1)
