@@ -33,12 +33,11 @@ jobs:
 
     - name: Fetch dependencies
       shell: bash
-      run: ./fetch
+      run: python fetch.py
 
     - name: Build
       shell: bash
-      run: |
-        python build.py
+      run: python build.py
 
     - name: Archive x64 artifact
       uses: actions/upload-artifact@v4
