@@ -1,0 +1,10 @@
+*.aps
+*.vcxproj.user
+
+.vs/
+.vscode/
+External/
+fuckms/
+out/
+build/
+generated/

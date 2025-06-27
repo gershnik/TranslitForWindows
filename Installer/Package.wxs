@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (c) 2023, Eugene Gershnik
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  
+  <?define BinariesGuid64="34d52fca-9578-4cb0-a35e-72afb0515ad8"?>
+  <?define BinariesGuidX86="e8eb88b0-a46c-4620-9e15-141123cc1eed"?>
+  
+  <?if $(sys.BUILDARCH)="x64" or $(sys.BUILDARCH)="arm64" ?>
+    <?define SettingsMain="Settings64"?>
+    <?define DllMain="Dll64"?>
+    <?define BinDirMain="BinDir64"?>
+  <?else?>
+    <?error Unsupported value of sys.BUILDARCH=$(sys.BUILDARCH)?>
+  <?endif?>
+  
+  <Package Id="com.gershnik.Translit" Name="Translit"
+           Scope="perMachine"
+           Manufacturer="Eugene Gershnik" 
+           Version="$(var.TLVersion)">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes"/>
+
+    <Property Id="ARPPRODUCTICON" Value="MainIcon.exe" />
+    <Property Id="ARPNOREPAIR" Value="yes" Secure="yes"/>
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <Property Id="REALVERSIONNT">
+      <RegistrySearch Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="LCUVer" Type="raw"/>
+    </Property>
+
+    <Property Id="REALARCH">
+      <RegistrySearch Root="HKLM" Key="SYSTEM\CurrentControlSet\Control\Session Manager\Environment" Name="PROCESSOR_ARCHITECTURE" Type="raw"/>
+    </Property>
+
+    <Launch Condition="REALVERSIONNT >= &quot;10.0.19000&quot;" Message="Your Windows version is too old to run this app. Please upgrade."/>
+    <?if $(sys.BUILDARCH)="x64" ?>
+      <Launch Condition="REALARCH = &quot;AMD64&quot;" Message="This application requires x64 CPU architecture"/>
+    <?elseif $(sys.BUILDARCH)="arm64" ?>
+      <Launch Condition="REALARCH = &quot;ARM64&quot;" Message="This application requires ARM64 CPU architecture"/>
+    <?endif?>
+    
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+    <WixVariable Id="WixUIDialogBmp" Value="dlgbmp.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="bannrbmp.bmp" />
+    
+    <Icon Id="MainIcon.exe" SourceFile="$(var.TLSourceRoot)\Settings\res\Translit.ico"/>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="BinDir64" Name="Translit">
+        <Component Id="Binaries64" Guid="$(var.BinariesGuid64)" Bitness="always64">
+          <File Id="Settings64" KeyPath="yes" Name="TranslitSettings.exe" Source='$(var.TLProductBinaries64)\TranslitSettings.exe' Vital='yes'>
+            <Shortcut Id="MainShortcut" Name="Translit" Directory="ProgramMenuFolder" Advertise="yes"
+                      WorkingDirectory="BinDir64" Icon="MainIcon.exe" IconIndex="0" />
+          </File>
+          <File Id="Dll64" Name="Translit.dll" Source='$(var.TLProductBinaries64)\Translit.dll' Vital='yes'/>
+          <RegistryKey Root="HKLM" Key="SOFTWARE\Classes\CLSID\{29041c62-d41d-489a-b299-864946c60c2e}">
+            <RegistryValue Type="string" Value="Translit Text Service"/>
+            <RegistryKey Key="InProcServer32">
+              <RegistryValue Type="string" Value="[#Dll64]"/>
+              <RegistryValue Type="string" Name="ThreadingModel" Value="Apartment"/>
+            </RegistryKey>
+          </RegistryKey>
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="BinDirX86" Name="Translit">
+        <Component Id="BinariesX86" Guid="$(var.BinariesGuidX86)" Bitness="always32">
+          <File Id="SettingsX86" KeyPath="yes" Name="TranslitSettings.exe" Source='$(var.TLProductBinariesX86)\TranslitSettings.exe' Vital='yes'/>
+          <File Id="DllX86" Name="Translit.dll" Source='$(var.TLProductBinariesX86)\Translit.dll' Vital='yes'/>
+          <RegistryKey Root="HKLM" Key="SOFTWARE\WOW6432Node\Classes\CLSID\{29041c62-d41d-489a-b299-864946c60c2e}">
+            <RegistryValue Type="string" Value="Translit Text Service"/>
+            <RegistryKey Key="InProcServer32">
+              <RegistryValue Type="string" Value="[#DllX86]"/>
+              <RegistryValue Type="string" Name="ThreadingModel" Value="Apartment"/>
+            </RegistryKey>
+          </RegistryKey>
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <SetProperty Id="RegisterMain" Before="RegisterMain" Value="[ENABLED_LANGUAGES]" Sequence="execute"/>
+    <SetProperty Id="RollbackUnregisterMain" Before="RollbackUnregisterMain" Value="[ENABLED_LANGUAGES]" Sequence="execute"/>
+    
+    <CustomAction Id="RegisterMain" Execute="deferred" Impersonate="no" FileRef="$(var.DllMain)" DllEntry="RegisterProfilesAction"/>
+    <CustomAction Id="RollbackRegisterMain" Execute="rollback" Impersonate="no" FileRef="$(var.DllMain)" DllEntry="UnregisterProfilesAction"/>
+    <CustomAction Id="UnregisterMain" Execute="deferred" Impersonate="no" FileRef="$(var.DllMain)" DllEntry="UnregisterProfilesAction"/>
+    <CustomAction Id="RollbackUnregisterMain" Execute="rollback" Impersonate="no" FileRef="$(var.DllMain)" DllEntry="RegisterProfilesAction"/>
+    
+    <InstallExecuteSequence>
+      <Custom Action="RegisterMain" After="StartServices" Condition="NOT REMOVE~=&quot;ALL&quot;"/>
+      <Custom Action="RollbackRegisterMain" After="RegisterMain" Condition="NOT REMOVE~=&quot;ALL&quot;"/>
+      <Custom Action="UnregisterMain" Before="RollbackUnregisterMain" Condition="REMOVE~=&quot;ALL&quot;"/>
+      <Custom Action="RollbackUnregisterMain" Before="StopServices" Condition="REMOVE~=&quot;ALL&quot;"/>
+    </InstallExecuteSequence>
+
+    <UI Id="WixUI_Minimal">
+      <UIRef Id="WixUI_Common" />
+
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Segoe UI" Size="9" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Segoe UI" Size="11" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Segoe UI" Size="9" Bold="yes" />
+      <TextStyle Id="BannerTitle" FaceName="Segoe UI" Size="11" Bold="yes" />
+
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <Property Id="WixUI_Mode" Value="Minimal" />
+
+      <Dialog Id="SelectLanguageDlg" Width="370" Height="270" Title="[ProductName] [Setup]" NoMinimize="yes">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="!(loc.LicenseAgreementDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="373" Height="0" />
+
+        <Control Id="Title" Type="Text" X="20" Y="14" Width="220" Height="60" Transparent="yes" NoPrefix="yes">
+          <Text Value="{\BannerTitle}Select languages to enable by default."/>
+        </Control>
+
+
+        <Control Id="CheckRU" Type="CheckBox" X="20" Y="70" Width="80" Height="14" Text="Russian" CheckBoxValue="ru" Property="SelectedRU"/>
+        <Control Id="CheckUK" Type="CheckBox" X="20" Y="86" Width="80" Height="14" Text="Ukrainian" CheckBoxValue="uk" Property="SelectedUK"/>
+        <Control Id="CheckBE" Type="CheckBox" X="20" Y="102" Width="80" Height="14" Text="Belarusian" CheckBoxValue="be" Property="SelectedBE"/>
+        <Control Id="CheckHE" Type="CheckBox" X="20" Y="118" Width="80" Height="14" Text="Hebrew" CheckBoxValue="he" Property="SelectedHE"/>
+        
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)"
+                 EnableCondition="SelectedRU Or SelectedUK Or SelectedBE Or SelectedHE" 
+                 DisableCondition="Not (SelectedRU Or SelectedUK Or SelectedBE Or SelectedHE)">
+          <Publish Property="ENABLED_LANGUAGES" Value="[SelectedRU];[SelectedUK];[SelectedBE];[SelectedHE]"/>
+          <Publish Event="NewDialog" Value="MyPrepareDlg"/>
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg"/>
+        </Control>
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="LicenseAgreementDlg"/>
+        </Control>
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="373" Height="0" />
+      </Dialog>
+
+      <InstallUISequence>
+        <Show Dialog="virtual MyPrepareDlg" Before="AppSearch" />
+      </InstallUISequence>
+
+      <Dialog Id="MyPrepareDlg" Width="370" Height="270" Title="!(loc.PrepareDlg_Title)" Modeless="yes">
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+        <Control Id="Bitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="!(loc.PrepareDlgBitmap)" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="373" Height="0" />
+        <Control Id="Description" Type="Text" X="135" Y="82" Width="220" Height="60" Transparent="yes" NoPrefix="yes" Text="!(loc.PrepareDlgDescription)" />
+        <Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes" Text="!(loc.PrepareDlgTitle)" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" TabSkip="yes" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Disabled="yes" TabSkip="yes" Text="!(loc.WixUINext)" />
+        <Control Id="ActionData" Type="Text" X="135" Y="144" Width="220" Height="30" Transparent="yes" NoPrefix="yes">
+          <Subscribe Event="ActionData" Attribute="Text" />
+        </Control>
+        <Control Id="ActionText" Type="Text" X="135" Y="174" Width="220" Height="20" Transparent="yes" NoPrefix="yes">
+          <Subscribe Event="ActionText" Attribute="Text" />
+        </Control>
+      </Dialog>
+
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <!--DialogRef Id="PrepareDlg" /-->
+      <DialogRef Id="LicenseAgreementDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+
+      <DialogRef Id="WelcomeDlg" />
+
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg"/>
+
+      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg"/>
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="SelectLanguageDlg"/>
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999"/>
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg"/>
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg"/>
+
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg"/>
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg"/>
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg"/>
+    </UI>
+  </Package>
+</Wix>

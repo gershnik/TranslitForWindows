@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4f7c3df1-08d0-4b23-bd0d-995dc19436ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include Files">
+      <UniqueIdentifier>{88589782-8836-42ae-b88e-abc90fdbe888}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\Transliterator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="inc\Mapper\Mapper.hpp">
+      <Filter>Include Files</Filter>
+    </ClInclude>
+    <ClInclude Include="inc\Mapper\MultiMatch.hpp">
+      <Filter>Include Files</Filter>
+    </ClInclude>
+    <ClInclude Include="inc\Mapper\Transliterator.hpp">
+      <Filter>Include Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

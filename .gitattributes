@@ -1,0 +1,9 @@
+* text eol=lf
+*.sln text eol=crlf
+*.vcxproj text eol=crlf
+*.vcxproj.filters text eol=crlf
+
+*.ico binary
+*.bmp binary
+*.png binary
+

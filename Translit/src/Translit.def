@@ -1,0 +1,11 @@
+EXPORTS
+        DllGetClassObject    PRIVATE
+        DllCanUnloadNow      PRIVATE
+        DllRegisterServer    PRIVATE
+        DllUnregisterServer  PRIVATE
+
+        RegisterProfilesAction
+        UnregisterProfilesAction
+
+        getProfiles
+        getProfileById
