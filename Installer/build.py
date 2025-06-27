@@ -20,14 +20,14 @@ def build(command: str, config: str, arch: str, builddir:Path):
     msi = outdir / f"Translit-{arch.lower()}.msi"
 
     if command == 'clean' or command == 'rebuild':
-        print('Cleaning...\n==========\n', flush=True)
+        print('\nInstaller: Cleaning\n', flush=True)
         shutil.rmtree(intdir, ignore_errors=True)
         if (intdir.exists()):
             print(f'Unable to remove {intdir}', file=sys.stderr)
             return 1
         msi.unlink(missing_ok=True)
         msi.with_suffix('.wixpdb').unlink(missing_ok=True)
-        print('\nDone\n==========\n', flush=True)
+        print('\n', flush=True)
     
     if command == 'clean':
         return 0
@@ -38,22 +38,22 @@ def build(command: str, config: str, arch: str, builddir:Path):
     major = macros.find('BuildMajorVersion', namespaces).text
     minor = macros.find('BuildMinorVersion', namespaces).text
     patch = macros.find('BuildPatchVersion', namespaces).text
-    print(f'Version: {major}.{minor}.{patch}', flush=True)
+    print(f'Installer: Version: {major}.{minor}.{patch}', flush=True)
 
-    print('Building x86...\n==========\n', flush=True)
+    print('Installer: Building x86\n', flush=True)
     subprocess.run([msbuild, SRCDIR / 'Translit.sln', 
                     '/t:Settings', '/p:Configuration=Release;Platform=x86',
                     '-v:m'], check=True)
-    print('\nDone\n==========\n', flush=True)
+    print('\n', flush=True)
 
     
-    print(f'Building {arch}...\n==========\n', flush=True)
+    print(f'Installer: Building {arch}\n', flush=True)
     subprocess.run([msbuild, SRCDIR / 'Translit.sln', 
                     '/t:Settings', f'/p:Configuration=Release;Platform={arch}',
                     '-v:m'], check=True)
-    print('\nDone\n==========\n', flush=True)
+    print('\n', flush=True)
 
-    print('Building MSI...\n==========\n', flush=True)
+    print('Installer: Building MSI...', flush=True)
     subprocess.run(['wix', 'build',
         '-ext', 'WixToolset.UI.wixext',
         '-ext', 'WixToolset.Util.wixext',
@@ -67,11 +67,11 @@ def build(command: str, config: str, arch: str, builddir:Path):
         '-loc', 'Strings.wxl',
         '-out', msi,
         'Package.wxs'], check=True)
-    print('\nDone\n==========\n', flush=True)
+    print('\n', flush=True)
 
-    print('Validating MSI...\n==========\n', flush=True)
+    print('Installer: Validating MSI...', flush=True)
     subprocess.run(['wix', 'msi', 'validate', msi], check=True)
-    print('\nDone\n==========\n', flush=True)
+    print('\n', flush=True)
 
 
 def main():
