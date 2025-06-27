@@ -23,10 +23,8 @@ This is a counterpart of a Mac version available at https://github.com/gershnik/
 
 - [Features](#features)
 - [Installation](#installation)
-    - [Basics](#basics)
-    - [Keyboard shortcuts](#keyboard-shortcuts)
-    - [Viewing/Configuring transliteration mappings](#viewingconfiguring-transliteration-mappings)
-    - [Uninstallation](#uninstallation)
+- [Configuration](#configuration)
+- [Uninstall](#uninstall)
 - [Mappings](#mappings)
 - [Building](#building)
 
@@ -67,7 +65,7 @@ This is a counterpart of a Mac version available at https://github.com/gershnik/
 * That's pretty much it. You can now switch between English and Translit in any app using this menu or via
   `⊞ + Spacebar` key combination. 
 
-### Configuration
+## Configuration
 
 When one of the Translit languages is active the system tray will have one additional icon and look like this:
 
@@ -88,7 +86,7 @@ dialog.
 
 The app stays on top of other Windows to allow you to see the mappings when typing in another Window.
 
-### Uninstall
+## Uninstall
 
 Translit can be fully uninstalled via standard "Add/Remove Programs" (a.k.a. "Apps->Installed Apps")
 system panel.
