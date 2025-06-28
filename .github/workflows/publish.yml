@@ -46,13 +46,16 @@ jobs:
         mv build/Installers/Release/Translit-arm64.pdb.zip build/Installers/Release/Translit-${{ env.GH_BUILD_VERSION }}-arm64.pdb.zip
 
     - name: Upload Symbols
-      shell: pwsh
+      shell: bash
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
-        aws s3 cp (get-item build\Installers\Release\Translit-*.pdb.zip) "s3://translit-symbols/"
+        for f in build/Installers/Release/Translit-*.pdb.zip
+        do 
+          aws s3 cp $f "s3://translit-symbols/"
+        done
       
     - name: Make release
       uses: softprops/action-gh-release@v2
