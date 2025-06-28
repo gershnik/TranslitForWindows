@@ -28,15 +28,10 @@
     <Property Id="ARPNOREPAIR" Value="yes" Secure="yes"/>
     <Property Id="ARPNOMODIFY" Value="1" />
 
-    <Property Id="REALVERSIONNT">
-      <RegistrySearch Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="LCUVer" Type="raw"/>
-    </Property>
-
     <Property Id="REALARCH">
       <RegistrySearch Root="HKLM" Key="SYSTEM\CurrentControlSet\Control\Session Manager\Environment" Name="PROCESSOR_ARCHITECTURE" Type="raw"/>
     </Property>
 
-    <Launch Condition="REALVERSIONNT >= &quot;10.0.19000&quot;" Message="Your Windows version is too old to run this app. Please upgrade."/>
     <?if $(sys.BUILDARCH)="x64" ?>
       <Launch Condition="REALARCH = &quot;AMD64&quot;" Message="This application requires x64 CPU architecture"/>
     <?elseif $(sys.BUILDARCH)="arm64" ?>
