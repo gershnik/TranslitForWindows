@@ -110,6 +110,17 @@ int APIENTRY wWinMain([[maybe_unused]] _In_ HINSTANCE hInstance,
     }
     g_dataFolder = std::move(dataFolder);
 
+    unqiue_co_membuf<wchar_t []> verInfo;
+    auto hres = GetAvailableCoreWebView2BrowserVersionString(nullptr, std::out_ptr(verInfo));
+    if (FAILED(hres) || !verInfo) {
+        MessageBox(nullptr, 
+                   L"WebView2 is not present on your machine. "
+                      "Please ensure it is fully updated and Microsoft Edge browser is installed "
+                      "(it doesn't need to be default)",
+                   L"Translit: Fatal Error", MB_ICONHAND);
+        return EXIT_FAILURE;
+    }
+
     applyUISettings();
 
     auto rootWindow = RootWindow::create();
