@@ -7,6 +7,7 @@
 <!-- Links -->
 [translit_ru]: https://translit.ru
 [releases]: https://github.com/gershnik/TranslitForWindows/releases
+[mactranslit]: https://github.com/gershnik/Translit
 
 <!-- End Links -->
 
@@ -15,9 +16,12 @@ type in other languages by using common Latin transliteration of the target lang
 Currently supported target languages are Russian, Hebrew, Ukrainian and Belarusian. 
 To give an example, typing `privet` in Russian mode will produce `привет` and typing `hi` in Hebrew mode will produce `הי`.
 
-This is a counterpart of a Mac version available at https://github.com/gershnik/Translit
-
 [^1]: sometimes called an IME but technically IME is a different older technology
+
+> [!NOTE]
+> This software is for Windows only. A macOS version is available [here][mactranslit]
+
+<hr>
 
 - [Features](#features)
 - [Installation](#installation)
@@ -101,10 +105,10 @@ Currently supported character mappings can be found in the following documents
 
 Visual Studio 2022 or above and Python 3.11 or above are the only requirements to build Translit.
 If you want to build the installers you will also need 
-[WiX Toolset](https://github.com/wixtoolset/wix/releases) CLI version 6.
+[WiX Toolset](https://github.com/wixtoolset/wix) CLI version 6.
 
 * Download/clone the repo
-* Run `fetch` script from the top-level directory (current directory doesn't matter). 
+* Run `python fetch.py` script from the top-level directory. 
   This will fetch external dependencies
 * Open `Translit.sln` in Visual Studio and build the `Translit`, `Settings` or `Installer` targets
 
