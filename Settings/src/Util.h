@@ -26,11 +26,11 @@ inline void base64Encode(std::span<const uint8_t> data, sys_string_builder & bui
                              nullptr, &b64Count))
         abort();
     auto offset = builder.storage_size();
-    builder.resize_storage(offset + b64Count);
+    builder.resize_storage(offset + b64Count); //here it includes null terminator
     if (!CryptBinaryToString(data.data(), DWORD(data.size()), CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, 
                              LPWSTR(builder.chars().begin() + offset), &b64Count))
         abort();
-    builder.resize_storage(offset + b64Count - 1);
+    builder.resize_storage(offset + b64Count); //and here it doesn't, sigh!
 }
 
 
