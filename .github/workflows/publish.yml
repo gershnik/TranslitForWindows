@@ -52,7 +52,7 @@ jobs:
         AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: |
-        aws s3 cp "build/Installers/Release/Translit-*.pdb.zip" "s3://translit-symbols/"
+        aws s3 cp build/Installers/Release/Translit-*.pdb.zip "s3://translit-symbols/"
       
     - name: Make release
       uses: softprops/action-gh-release@v2
