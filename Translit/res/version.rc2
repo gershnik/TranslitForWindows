@@ -3,6 +3,9 @@
 // Version
 //
 
+#define TL_STR1(x) #x
+#define TL_STR(x) TL_STR1(x)
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION BUILD_MAJOR_VERSION,BUILD_MINOR_VERSION,BUILD_PATCH_VERSION
  PRODUCTVERSION BUILD_MAJOR_VERSION,BUILD_MINOR_VERSION,BUILD_PATCH_VERSION
@@ -22,12 +25,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Eugene Gershnik"
             VALUE "FileDescription", "Translit Text Service"
-            VALUE "FileVersion", BUILD_MAJOR_VERSION.BUILD_MINOR_VERSION.BUILD_PATCH_VERSION
+            VALUE "FileVersion", TL_STR(BUILD_MAJOR_VERSION.BUILD_MINOR_VERSION.BUILD_PATCH_VERSION)
             VALUE "InternalName", "Translit.dll"
-            VALUE "LegalCopyright", "Copyright © Eugene Gershnik. All Rights Reserved."
+            VALUE "LegalCopyright", "Copyright © Eugene Gershnik."
             VALUE "OriginalFilename", "Translit.dll"
             VALUE "ProductName", "Translit"
-            VALUE "ProductVersion", BUILD_MAJOR_VERSION.BUILD_MINOR_VERSION.BUILD_PATCH_VERSION
+            VALUE "ProductVersion", TL_STR(BUILD_MAJOR_VERSION.BUILD_MINOR_VERSION.BUILD_PATCH_VERSION)
         END
     END
     BLOCK "VarFileInfo"
