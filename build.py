@@ -62,11 +62,13 @@ def main():
     
     msbuild = studio_dir / f'MSBuild\\Current\\Bin\\{arch}\\MSBuild.exe'
 
-    subprocess.run([msbuild, MYDIR / 'Translit.sln', 
+    print(f'Building for x64', flush=True)
+    subprocess.run([msbuild, '-nologo', MYDIR / 'Translit.sln', 
                     '/t:Installer', '/p:Configuration=Release;Platform=x64',
                     '-v:m'], check=True)
     
-    subprocess.run([msbuild, MYDIR / 'Translit.sln', 
+    print(f'Building for arm64', flush=True)
+    subprocess.run([msbuild, '-nologo', MYDIR / 'Translit.sln', 
                     '/t:Installer', '/p:Configuration=Release;Platform=ARM64',
                     '-v:m'], check=True)
 

@@ -51,13 +51,13 @@ def build(command: str, config: str, arch: str, builddir:Path):
     print(f'Installer: Version: {major}.{minor}.{patch}', flush=True)
 
     print('Installer: Building x86\n', flush=True)
-    subprocess.run([msbuild, SRCDIR / 'Translit.sln', 
+    subprocess.run([msbuild, '-nologo', SRCDIR / 'Translit.sln', 
                     '/t:Settings', '/p:Configuration=Release;Platform=x86',
                     '-v:m'], check=True)
 
     
     print(f'Installer: Building {arch}\n', flush=True)
-    subprocess.run([msbuild, SRCDIR / 'Translit.sln', 
+    subprocess.run([msbuild, '-nologo', SRCDIR / 'Translit.sln', 
                     '/t:Settings', f'/p:Configuration=Release;Platform={arch}',
                     '-v:m'], check=True)
 
