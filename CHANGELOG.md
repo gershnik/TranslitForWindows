@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Added
+- Support for system input languages other than US English
+- Support for multiple system languages
+
+### Changed
+- Updated dependencies
+- Fixed minor installer issues with rollbacks and action scheduling
+
 ## [1.1] - 2026-05-09
 
 ### Added
@@ -13,8 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 - Updated external dependencies.
-- Hebrew: simplfied typing _niqqud_ characters
-- Internal: transliteration machinery now supports producing more than one destination charatcer as
+- Hebrew: simplified typing _niqqud_ characters
+- Internal: transliteration machinery now supports producing more than one destination character as
   output (for example to produce grapheme clusters).
 
 ### Fixed
