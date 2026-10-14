@@ -6,12 +6,10 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width">
-    <meta name="viewport" content="initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
-    <meta name="supported-color-schemes" content="light dark">
 
-    <title>Russian Mappings</title>
+    <title>Mappings</title>
 
     <style>
         html {
@@ -22,20 +20,20 @@
             margin: 0px;
             font-family: -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
             font-size: 14px;
-            -webkit-overflow-scrolling: touch;
         }
 
         #toolbar {
-            margin: 4px
+            padding: 4px;
+            white-space: nowrap;
+            width: max-content;
         }
 
-            #toolbar select {
-                -webkit-box-sizing: border-box;
-                box-sizing: border-box;
-                padding-top: 3px;
-                padding-bottom: 2px;
-                vertical-align: top;
-            }
+        #toolbar select {
+            box-sizing: border-box;
+            padding-top: 3px;
+            padding-bottom: 2px;
+            vertical-align: top;
+        }
 
         table {
             table-layout: auto;
@@ -55,11 +53,11 @@
             white-space: nowrap;
         }
 
-            table.main td.combining {
-                font-family: 'Times New Roman';
-                font-size: 24px;
-                unicode-bidi: bidi-override;
-            }
+        table.main td.combining {
+            font-family: 'Times New Roman';
+            font-size: 24px;
+            unicode-bidi: bidi-override;
+        }
 
         table.multi td {
             margin: 0px;
@@ -72,22 +70,20 @@
         }
 
         tr.contentRow {
-            background-color: #F0F0F0
+            background-color: #F0F0F0;
+        }
+
+        code {
+            background-color: #F0F0F0;
         }
 
         @media (prefers-color-scheme: dark) {
             tr.contentRow {
-                background-color: #303030
+                background-color: #303030;
             }
-        }
 
-        code {
-            background-color: #F0F0F0
-        }
-
-        @media (prefers-color-scheme: dark) {
             code {
-                background-color: #303030
+                background-color: #303030;
             }
         }
 
@@ -98,108 +94,137 @@
     </style>
 
     <script>
-        var g_activeDiv = null;
+        'use strict';
+
+        let g_activeDiv = null;
+
+        function fillPicker(picker, items, selectedId) {
+            picker.textContent = '';
+            for (const item of items) {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.text = item.name;
+                if (item.id === selectedId)
+                    option.selected = true;
+                picker.appendChild(option);
+            }
+        }
 
         function onLoadModel(data) {
 
-        langPicker = document.getElementById('langPicker');
-        langPicker.textContent = '';
-        for (const lang of data.languages) {
-        var option = document.createElement("option");
-        option.value = lang.id;
-        option.text = lang.name;
-        if (lang.id == data.selectedLanguage) {
-        option.selected = 'selected';
-        }
-        langPicker.appendChild(option);
-        }
-        langPicker.style.display = data.languages.length ? 'inline' : 'none';
+            const inputLangPicker = document.getElementById('inputLangPicker');
+            fillPicker(inputLangPicker, data.inputLanguages, data.selectedInputLanguage);
+            inputLangPicker.style.display = data.inputLanguages.length > 1 ? 'inline' : 'none';
 
-        mappingPicker = document.getElementById('mappingPicker');
-        mappingPicker.textContent = '';
-        for (var i = 0; i < data.mappings.length; ++i) {
-        const mapping = data.mappings[i]
-        var option = document.createElement("option");
-        option.text = mapping;
-        if (i == data.selectedMapping) {
-        option.selected = 'selected';
-        }
-        mappingPicker.appendChild(option);
-        }
-        mappingPicker.style.display = data.mappings.length > 1 ? 'inline' : 'none';
+            const langPicker = document.getElementById('langPicker');
+            fillPicker(langPicker, data.languages, data.selectedLanguage);
+            langPicker.style.display = data.languages.length ? 'inline' : 'none';
 
-        if (g_activeDiv != null) {
-        g_activeDiv.style.display = 'none';
-        g_activeDiv = null;
-        }
-        if (data.mappingTable !== '') {
-        g_activeDiv = document.getElementById(data.mappingTable);
-        g_activeDiv.style.display = 'block';
-        } else {
-        g_activeDiv = document.getElementById('no-langs');
-        g_activeDiv.style.display = 'block';
-        }
+            const mappingPicker = document.getElementById('mappingPicker');
+            mappingPicker.textContent = '';
+            for (let i = 0; i < data.mappings.length; ++i) {
+                const option = document.createElement('option');
+                option.text = data.mappings[i];
+                if (i == data.selectedMapping)
+                    option.selected = true;
+                mappingPicker.appendChild(option);
+            }
+            mappingPicker.style.display = data.mappings.length > 1 ? 'inline' : 'none';
 
-        addButton = document.getElementById('addButton');
-        addButton.disabled = !data.canAdd;
+            if (g_activeDiv != null) {
+                g_activeDiv.style.display = 'none';
+                g_activeDiv = null;
+            }
+            if (data.mappingTable !== '') {
+                g_activeDiv = document.getElementById(data.mappingTable);
+            } else if (data.canAdd) {
+                g_activeDiv = document.getElementById('no-langs');
+            } else {
+                g_activeDiv = document.getElementById('needs-reinstall');
+            }
+            g_activeDiv.style.display = 'block';
 
-        removeButton = document.getElementById('removeButton');
-        removeButton.disabled = !data.canRemove;
+            document.getElementById('addButton').disabled = !data.canAdd;
+            document.getElementById('removeButton').disabled = !data.canRemove;
         }
 
         function onShowLangs() {
-        langPicker = document.getElementById('langPicker');
-        langPicker.showPicker();
+            document.getElementById('langPicker').showPicker();
         }
 
         window.chrome.webview.addEventListener('message', arg => {
-        const data = arg.data;
-        if (data.type === 'model')
-        onLoadModel(data)
-        else if (data.type === 'showlangs')
-        onShowLangs();
-
+            const data = arg.data;
+            if (data.type === 'model')
+                onLoadModel(data);
+            else if (data.type === 'showlangs')
+                onShowLangs();
         });
 
+        function onSelectInputLanguage() {
+            const picker = document.getElementById('inputLangPicker');
+            const langId = Number(picker.options[picker.selectedIndex].value);
+            window.chrome.webview.postMessage({
+                type: 'onSelectInputLanguage',
+                value: langId
+            });
+        }
 
         function onSelectLanguage() {
-
-        langPicker = document.getElementById('langPicker');
-        const profileId = langPicker.options[langPicker.selectedIndex].value;
-        window.chrome.webview.postMessage({type: 'onSelectLanguage', value: profileId});
+            const langPicker = document.getElementById('langPicker');
+            const profileId = langPicker.options[langPicker.selectedIndex].value;
+            window.chrome.webview.postMessage({
+                type: 'onSelectLanguage',
+                value: profileId,
+            });
         }
 
         function onSelectMapping() {
-        mappingPicker = document.getElementById('mappingPicker');
-        const mappingIdx = mappingPicker.selectedIndex;
-        window.chrome.webview.postMessage({type: 'onSelectMapping', value: mappingIdx});
+            const mappingIdx = document.getElementById('mappingPicker').selectedIndex;
+            window.chrome.webview.postMessage({
+                type: 'onSelectMapping',
+                value: mappingIdx
+            });
         }
 
         function onAddLanguage() {
-        window.chrome.webview.postMessage({type: 'onAddLanguage'});
+            window.chrome.webview.postMessage({
+                type: 'onAddLanguage'
+            });
         }
 
         function onRemoveLanguage() {
-        window.chrome.webview.postMessage({type: 'onRemoveLanguage'});
+            window.chrome.webview.postMessage({
+                type: 'onRemoveLanguage'
+            });
         }
 
         function onShowAbout() {
-        window.chrome.webview.postMessage({type: 'onShowAbout'});
+            window.chrome.webview.postMessage({type: 'onShowAbout'});
         }
 
+        function getDesiredSize() {
+            return {
+                height: document.getElementById('content').scrollHeight,
+                width: document.getElementById('content').scrollWidth
+            }
+        }
     </script>
 </head>
 <body>
     <div id="content">
         <div id="toolbar">
+            <select id="inputLangPicker" title="Input language" onchange="onSelectInputLanguage()"></select>
             <select id="langPicker" title="Language" onchange="onSelectLanguage()"></select>
             <select id="mappingPicker" title="Active mapping scheme" onchange="onSelectMapping()"></select>
             <input type="button" id="addButton" value="➕" title="Add languages" onclick="onAddLanguage()" />
             <input type="button" id="removeButton" value="➖" title="Remove current language" onclick="onRemoveLanguage()" />
             <input type="button" value="❓" title="About…" onclick="onShowAbout()" />
         </div>
-        <div id="no-langs" style="width:100%;display:none;height:200px;align-content:center;;text-align:center;">
+        <div id="no-langs" style="width:100%;display:none;height:200px;align-content:center;text-align:center;">
             No Translit languages are currently enabled. Press ➕ above to enable some.
+        </div>
+        <div id="needs-reinstall" style="width:100%;display:none;height:200px;align-content:center;text-align:center;">
+            Translit is not installed for this input language. Please re-install Translit.
         </div>
         <!-- THE TABLES BELOW ARE AUTO-GENERATED. DO NOT EDIT. -->
         <div id="mapping-be" style="width:100%;display:none">

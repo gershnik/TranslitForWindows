@@ -88,74 +88,121 @@ Model::Model() :
     
     comTest(m_threadMgr->GetGlobalCompartment(std::out_ptr(m_globalCompartments)));
 
+    //LANGID currentLangId;
+    //comTest(m_inputProfiles->GetCurrentLanguage(&currentLangId));
+
     loadData();
 }
 
 void Model::loadData() {
 
-    m_enabledProfiles.clear();
-    m_enabledProfilesIndices.clear();
-    m_disabledProfiles.clear();
-    m_disabledProfilesIndices.clear();
+    m_inputLangs.load(m_inputProfiles);
+
+    m_perInput.clear();
+    m_activeInputLang.reset();
     m_activeProfile = nullptr;
     m_activeMappingInfo.reset();
 
-    std::set<uuid> existingProfiles;
+    for(auto inputLangId: m_inputLangs) {
+        auto & perInput = m_perInput[inputLangId];
+        
+        std::set<uuid> existingProfiles;
 
-    com_shared_ptr<IEnumTfLanguageProfiles> enumerator;
-    comTest(m_inputProfiles->EnumLanguageProfiles(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), std::out_ptr(enumerator)));
-    for ( ; ; ) {
-        TF_LANGUAGEPROFILE profiles[20];
-        ULONG count;
-        auto res = comTest(enumerator->Next(ULONG(std::size(profiles)), profiles, &count));
-        for (ULONG i = 0; i < count; ++i) {
-            if (profiles[i].clsid == g_translitServiceId)
-                existingProfiles.insert(profiles[i].guidProfile);
+        com_shared_ptr<IEnumTfLanguageProfiles> enumerator;
+        comTest(m_inputProfiles->EnumLanguageProfiles(inputLangId, std::out_ptr(enumerator)));
+        for ( ; ; ) {
+            TF_LANGUAGEPROFILE profiles[20];
+            ULONG count;
+            auto res = comTest(enumerator->Next(ULONG(std::size(profiles)), profiles, &count));
+            for (ULONG i = 0; i < count; ++i) {
+                if (profiles[i].clsid == g_translitServiceId)
+                    existingProfiles.insert(profiles[i].guidProfile);
+            }
+            if (res != S_OK)
+                break;
         }
-        if (res != S_OK)
-            break;
-    }
 
-    for(auto & profileInfo: getProfiles()) {
-        if (!existingProfiles.contains(*profileInfo.id))
-            continue;
-        BOOL enabled = false;
-        comTest(m_inputProfiles->IsEnabledLanguageProfile(g_translitServiceId, 
-                                                            MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-                                                            *profileInfo.id,
-                                                            &enabled));
-        if (enabled) {
-            m_enabledProfiles.push_back(&profileInfo);
-            m_enabledProfilesIndices.emplace(&profileInfo, m_enabledProfiles.size() - 1);
-        } else {
-            m_disabledProfiles.push_back(&profileInfo);
-            m_disabledProfilesIndices.emplace(&profileInfo, m_disabledProfiles.size() - 1);
+        for(auto & profileInfo: getProfiles()) {
+            if (!existingProfiles.contains(*profileInfo.id))
+                continue;
+            BOOL enabled = false;
+            comTest(m_inputProfiles->IsEnabledLanguageProfile(g_translitServiceId, 
+                                                              inputLangId,
+                                                              *profileInfo.id,
+                                                              &enabled));
+            if (enabled) {
+                perInput.enabledProfiles.push_back(&profileInfo);
+                perInput.enabledProfilesIndices.emplace(&profileInfo, perInput.enabledProfiles.size() - 1);
+            } else {
+                perInput.disabledProfiles.push_back(&profileInfo);
+                perInput.disabledProfilesIndices.emplace(&profileInfo, perInput.disabledProfiles.size() - 1);
+            }
         }
     }
-
 
     LANGID langId;
     GUID activeProfileId;
-    comTest(m_inputProfiles->GetActiveLanguageProfile(g_translitServiceId, &langId, &activeProfileId));
-    if (auto activeIt = m_enabledProfilesIndices.find(uuid(activeProfileId)); activeIt != m_enabledProfilesIndices.end()) {
-        m_activeProfile = m_enabledProfiles[activeIt->second];
-        activateActiveProfile(); //sic! the fact that we see it as active doesn't mean that webview does etc.
-    } else if (!m_enabledProfiles.empty()) {
-        m_activeProfile = m_enabledProfiles[0];
-        activateActiveProfile();
+    HRESULT hres = comTest(m_inputProfiles->GetActiveLanguageProfile(g_translitServiceId, &langId, &activeProfileId));
+    if (hres == S_OK) {
+        assert(m_perInput.find(langId) != m_perInput.end());
+        m_activeInputLang = langId;
+    } else if (!m_inputLangs.empty()) {
+        m_activeInputLang = m_inputLangs.front();
     }
-    if (m_activeProfile && m_activeProfile->mappingCompartmentId)
-        m_activeMappingInfo.emplace(m_globalCompartments, m_threadMgrActivation.clientId(), 
-                                    *m_activeProfile->mappingCompartmentId, int(m_activeProfile->mappings.size()));
-    else
-        m_activeMappingInfo.reset();
+    if (m_activeInputLang) {
+        auto & perInput = m_perInput[*m_activeInputLang];
+        if (auto activeIt = perInput.enabledProfilesIndices.find(uuid(activeProfileId)); activeIt != perInput.enabledProfilesIndices.end()) {
+            m_activeProfile = perInput.enabledProfiles[activeIt->second];
+            activateActiveProfile(); //sic! the fact that we see it as active doesn't mean that webview does etc.
+        } else if (!perInput.enabledProfiles.empty()) {
+            m_activeProfile = perInput.enabledProfiles[0];
+            activateActiveProfile();
+        }
+        if (m_activeProfile && m_activeProfile->mappingCompartmentId)
+            m_activeMappingInfo.emplace(m_globalCompartments, m_threadMgrActivation.clientId(), 
+                                        *m_activeProfile->mappingCompartmentId, int(m_activeProfile->mappings.size()));
+        else
+            m_activeMappingInfo.reset();
+    }
 
     for (auto listener: m_listeners)
         listener->onModelReload();
 }
 
+void Model::setActiveInputLanguage(LANGID langId) {
+    m_activeInputLang = langId;
+    auto & perInput = m_perInput[langId];
+    bool carryOver = false;
+    if (m_activeProfile) {
+        if (auto activeIt = perInput.enabledProfilesIndices.find(*m_activeProfile->id); activeIt != perInput.enabledProfilesIndices.end()) {
+            activateActiveProfile(); //sic! the fact that we see it as active doesn't mean that webview does etc.
+            carryOver = true;
+        }
+    }
+    if (!carryOver) {
+        if (!perInput.enabledProfiles.empty()) {
+            m_activeProfile = perInput.enabledProfiles[0];
+            activateActiveProfile();
+        } else {
+            m_activeProfile = nullptr;
+        }
+    }
+
+    if (m_activeProfile && m_activeProfile->mappingCompartmentId)
+        m_activeMappingInfo.emplace(m_globalCompartments, m_threadMgrActivation.clientId(), 
+            *m_activeProfile->mappingCompartmentId, int(m_activeProfile->mappings.size()));
+    else
+        m_activeMappingInfo.reset();
+
+    for (auto listener: m_listeners)
+        listener->onModelReload(); //TODO: new event
+}
+
 void Model::setActiveProfile(const ProfileInfo * profile) {
     
+    if (!m_activeInputLang)
+        return;
+
     m_activeProfile = profile;
     if (m_activeProfile->mappingCompartmentId)
         m_activeMappingInfo.emplace(m_globalCompartments, m_threadMgrActivation.clientId(), 
@@ -170,43 +217,47 @@ void Model::setActiveProfile(const ProfileInfo * profile) {
 }
 
 void Model::activateActiveProfile() {
-    comTest(m_inputProfiles->ChangeCurrentLanguage(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)));
+    comTest(m_inputProfiles->ChangeCurrentLanguage(*m_activeInputLang));
     comTest(m_profileMgr->ActivateProfile(TF_PROFILETYPE_INPUTPROCESSOR, 
-                                          MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), 
+                                          *m_activeInputLang, 
                                           g_translitServiceId,
                                           *m_activeProfile->id, 
                                           nullptr, 
                                           TF_IPPMF_FORSESSION | TF_IPPMF_DONTCARECURRENTINPUTLANGUAGE));
     /*comTest(m_inputProfiles->ActivateLanguageProfile(g_translitServiceId, 
-                                                     MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), 
+                                                     *m_activeInputLang, 
                                                      *m_activeProfile->id));*/
 }
 
-void Model::onProfileChange(REFCLSID clsid, REFGUID guidProfile, bool activated) {
-    uuid newId;
-    if (activated && clsid == g_translitServiceId) {
-        newId = guidProfile;
-    } else {
+void Model::onProfileChange([[maybe_unused]] REFCLSID clsid, [[maybe_unused]] REFGUID guidProfile, bool activated) {
+
+    if (!activated)
+        return;
+    
+    if (clsid == g_translitServiceId) {
         LANGID langId;
         GUID profileId;
-        comTest(m_inputProfiles->GetActiveLanguageProfile(g_translitServiceId, &langId, &profileId));
-        newId = profileId;
-    }
-    if (!m_activeProfile || newId != *m_activeProfile->id) {
-        if (auto activeIt = m_enabledProfilesIndices.find(uuid(newId)); activeIt != m_enabledProfilesIndices.end()) {
-            m_activeProfile = m_enabledProfiles[activeIt->second];
-            if (m_activeProfile->mappingCompartmentId)
-                m_activeMappingInfo.emplace(m_globalCompartments, m_threadMgrActivation.clientId(), 
-                                            *m_activeProfile->mappingCompartmentId, int(m_activeProfile->mappings.size()));
-            else
-                m_activeMappingInfo.reset();
+        HRESULT hres = comTest(m_inputProfiles->GetActiveLanguageProfile(g_translitServiceId, &langId, &profileId));
+        if (hres == S_OK) {
+            if (auto foundLang = m_perInput.find(langId); foundLang != m_perInput.end()) {
+                m_activeInputLang = langId;
+                if (auto activeIt = foundLang->second.enabledProfilesIndices.find(uuid(profileId)); activeIt != foundLang->second.enabledProfilesIndices.end()) {
+                    m_activeProfile = foundLang->second.enabledProfiles[activeIt->second];
+                    if (m_activeProfile->mappingCompartmentId)
+                        m_activeMappingInfo.emplace(m_globalCompartments, m_threadMgrActivation.clientId(), 
+                            *m_activeProfile->mappingCompartmentId, int(m_activeProfile->mappings.size()));
+                    else
+                        m_activeMappingInfo.reset();
 
-            for (auto listener: m_listeners)
-                listener->onActiveProfileChange();
-        } else {
-            loadData();
+                    for (auto listener: m_listeners)
+                        listener->onActiveProfileChange();
+                    return;
+                }
+            }
         }
     }
+        
+    loadData();
 }
 
 sys_string Model::getActiveMappingTableName() const {

@@ -7,6 +7,7 @@
 #include <Translit/Identifiers.h>
 
 #include <Common/RegKey.h>
+#include <Common/AvailableLangs.h>
 
 class Model : public weak_ref_counted<Model> {
 	friend ref_counted;
@@ -89,19 +90,41 @@ public:
 	void removeListener(Listener * listener)
 		{ m_listeners.erase(listener); }
 
-	auto enabledProfiles() const 
-		{ return m_enabledProfiles | std::views::transform(DerefProfilePtr()); }
-	auto disabledProfiles() const 
-		{ return m_disabledProfiles | std::views::transform(DerefProfilePtr()); }
+	auto inputLanguages() const 
+		{ return m_inputLangs | std::views::all; }
+	std::optional<LANGID> getActiveInputLanguage() const
+		{ return m_activeInputLang; }
+	void setActiveInputLanguage(LANGID langId);
+
+	auto enabledProfiles() const {
+		static const std::vector<const ProfileInfo *> empty{}; 
+		if (m_activeInputLang) {
+			if (auto foundLang = m_perInput.find(*m_activeInputLang); foundLang != m_perInput.end())
+				return foundLang->second.enabledProfiles | std::views::transform(DerefProfilePtr());
+		}
+		return empty | std::views::transform(DerefProfilePtr());
+	}
+	auto disabledProfiles() const {
+		static const std::vector<const ProfileInfo *> empty{}; 
+		if (m_activeInputLang) {
+			if (auto foundLang = m_perInput.find(*m_activeInputLang); foundLang != m_perInput.end())
+				return foundLang->second.disabledProfiles | std::views::transform(DerefProfilePtr());
+		}
+		return empty | std::views::transform(DerefProfilePtr());
+	}
 	
 
 	const ProfileInfo * getActiveProfile() const
 		{ return m_activeProfile; }
 	int getActiveProfileIndex() const { 
-		if (!m_activeProfile)
+		if (!m_activeProfile || !m_activeInputLang)
 			return -1;
-		if (auto foundIt = m_enabledProfilesIndices.find(m_activeProfile); foundIt != m_enabledProfilesIndices.end())
-			return int(foundIt->second); 
+		if (auto foundLang = m_perInput.find(*m_activeInputLang); foundLang != m_perInput.end()) {
+			if (auto foundIt = foundLang->second.enabledProfilesIndices.find(m_activeProfile); 
+				foundIt != foundLang->second.enabledProfilesIndices.end()) {
+				return int(foundIt->second); 
+			}
+		}
 		return -1;
 	}
 	void setActiveProfile(const ProfileInfo * profile);
@@ -122,11 +145,22 @@ public:
 	template<std::ranges::input_range R>
 	requires(std::is_same_v<std::ranges::range_value_t<R>, const ProfileInfo *>)
 	void enableProfiles(const R & range, bool enable) {
-		for (auto info: range) {
+		if (!m_activeInputLang)
+			return;
+		for (auto [idx, info]: std::views::enumerate(range)) {
 			comTest(m_inputProfiles->EnableLanguageProfile(g_translitServiceId, 
-														   MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
+														   *m_activeInputLang,
 														   *info->id,
 														   enable));
+			if (enable && idx == 0) {
+				comTest(m_inputProfiles->ChangeCurrentLanguage(*m_activeInputLang));
+				comTest(m_profileMgr->ActivateProfile(TF_PROFILETYPE_INPUTPROCESSOR, 
+													  *m_activeInputLang, 
+													  g_translitServiceId,
+													  *info->id, 
+													  nullptr, 
+													  TF_IPPMF_FORSESSION | TF_IPPMF_DONTCARECURRENTINPUTLANGUAGE));
+			}
 		}
 		loadData();
 	}
@@ -148,11 +182,17 @@ private:
 	ThreadMgrActivation m_threadMgrActivation;
 	ActiveLanguageProfileNotifyRegistration m_activeLanguageProfileNotifyRegistration;
 
-	std::vector<const ProfileInfo *> m_enabledProfiles;
-	std::map<const ProfileInfo *, size_t, CompareProfilePtrById> m_enabledProfilesIndices;
-	std::vector<const ProfileInfo *> m_disabledProfiles;
-	std::map<const ProfileInfo *, size_t, CompareProfilePtrById> m_disabledProfilesIndices;
+	AvailableLangs m_inputLangs;
 
+	struct PerInputLang {
+		std::vector<const ProfileInfo *> enabledProfiles;
+		std::map<const ProfileInfo *, size_t, CompareProfilePtrById> enabledProfilesIndices;
+		std::vector<const ProfileInfo *> disabledProfiles;
+		std::map<const ProfileInfo *, size_t, CompareProfilePtrById> disabledProfilesIndices;
+	};
+	std::map<LANGID, PerInputLang> m_perInput;
+
+	std::optional<LANGID> m_activeInputLang;
 	const ProfileInfo * m_activeProfile = nullptr;
 	std::optional<ProfileMappingInfo> m_activeMappingInfo;
 

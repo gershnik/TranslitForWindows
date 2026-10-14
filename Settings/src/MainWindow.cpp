@@ -207,7 +207,13 @@ void MainWindow::handleWebEvent(ICoreWebView2WebMessageReceivedEventArgs * args)
     if (!ok)
         abort();
     const rapidjson::WValue & type = data[L"type"];
-    if (auto typeName = type.GetString(); wcscmp(typeName, L"onSelectLanguage") == 0) {
+    if (auto typeName = type.GetString(); wcscmp(typeName, L"onSelectInputLanguage") == 0) {
+        const rapidjson::WValue & value = data[L"value"];
+        auto langid = LANGID(value.GetUint());
+        scheduleAsyncCommand([langid](MainWindow * me) {
+            me->onSelectInputLanguage(langid);
+            });
+    } else if (wcscmp(typeName, L"onSelectLanguage") == 0) {
         const rapidjson::WValue & value = data[L"value"];
         uuid profileId = uuid::from_chars(std::span{value.GetString(), value.GetStringLength()}).value();
         scheduleAsyncCommand([profileId](MainWindow * me) {
@@ -252,28 +258,54 @@ bool MainWindow::onPosChanged(WINDOWPOS * /*pos*/) {
     return false;
 }
 
-void MainWindow::ensureHtmlHeight(const Scaling & scaling) {
+void MainWindow::ensureHtmlSize(const Scaling & scaling) {
 
-    int htmlRequestedHeight = scaling.dpiScale(m_htmlRequestedHeight);
+    int minimumClientHeight = scaling.dpiScale(m_htmlRequestedHeight);
+    int minimumClientWidth = scaling.dpiScale(m_htmlRequestedWidth);
+
     RECT bounds;
     if (!GetClientRect(handle(), &bounds))
         throwLastError();
-    int minimumClientHeight = htmlRequestedHeight;
+    
     RECT windowRect;
     if (!GetWindowRect(handle(), &windowRect))
         throwLastError();
-    int ncDelta = (windowRect.bottom - windowRect.top) - (bounds.bottom - bounds.top);
-    m_minHeight = minimumClientHeight + ncDelta;
+    int ncDeltaY = (windowRect.bottom - windowRect.top) - (bounds.bottom - bounds.top);
+    int ncDeltaX = (windowRect.right - windowRect.left) - (bounds.right - bounds.left);
+    m_minHeight = minimumClientHeight + ncDeltaY;
+    m_minWidth = minimumClientWidth + ncDeltaX;
 
+    std::optional<RECT> newRect;
     if (windowRect.bottom - windowRect.top < m_minHeight) {
+        newRect.emplace(windowRect);
         auto top = windowRect.top;
         auto & monitorRect = scaling.monitorRect();
         if (top + m_minHeight > monitorRect.bottom) {
             auto delta = (top + m_minHeight) - monitorRect.bottom;
-            top -= std::min(top, delta);
+            top = std::max(monitorRect.top, top - delta);
         }
-        SetWindowPos(handle(), HWND_TOP, windowRect.left, top, windowRect.right - windowRect.left, m_minHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+        newRect->top = top;
+        newRect->bottom = top + m_minHeight;
     }
+    if (windowRect.right - windowRect.left < m_minWidth) {
+        if (!newRect)
+            newRect.emplace(windowRect);
+        auto left = windowRect.left;
+        auto & monitorRect = scaling.monitorRect();
+        if (left + m_minWidth > monitorRect.right) {
+            auto delta = (left + m_minWidth) - monitorRect.right;
+            left = std::max(monitorRect.left, left - delta);
+        }
+        newRect->left = left;
+        newRect->right = left + m_minWidth;
+    }
+
+    if (newRect)
+        SetWindowPos(handle(), HWND_TOP, 
+                     newRect->left, newRect->top, 
+                     newRect->right - newRect->left, 
+                     newRect->bottom - newRect->top, 
+                     SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void MainWindow::onMinMaxInfo(MINMAXINFO & info) {
@@ -298,7 +330,7 @@ void MainWindow::onDpiChanged(int dpi, RECT & suggestedRect) {
                  suggestedRect.right - suggestedRect.left, 
                  suggestedRect.bottom - suggestedRect.top, SWP_NOZORDER | SWP_NOACTIVATE);
     
-    ensureHtmlHeight(scaling);
+    ensureHtmlSize(scaling);
 }
 
 void MainWindow::eraseBackground(HDC hdc) {
@@ -322,6 +354,25 @@ void MainWindow::onSettingsChange() {
 
 // Logic event handlers
 
+static std::wstring langIdDisplayName(LANGID langid) {
+    LCID lcid = MAKELCID(langid, SORT_DEFAULT);
+    std::wstring ret(64, L'\0');
+    int res;
+    for ( ; ; ) {
+        res = GetLocaleInfoW(lcid, LOCALE_SLOCALIZEDDISPLAYNAME, ret.data(), int(ret.size()));
+        if (res != 0)
+            break;
+        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+            throwLastError();
+        res = GetLocaleInfoW(lcid, LOCALE_SLOCALIZEDDISPLAYNAME, nullptr, 0);
+        if (res == 0)
+            throwLastError();
+        ret.resize(size_t(res));
+    }
+    ret.resize(size_t(res - 1));
+    return ret;
+}
+
 void MainWindow::loadModelData() {
     if (!m_webView)
         return;
@@ -332,6 +383,18 @@ void MainWindow::loadModelData() {
 
     writer.Key(L"type");
     writer.String(L"model");
+
+    writer.Key(L"inputLanguages");
+    writer.StartArray();
+    for(auto [index, langid]: std::views::enumerate(m_model->inputLanguages())) {
+        writer.StartObject();
+        writer.Key(L"name");
+        writer.String(langIdDisplayName(langid).c_str());
+        writer.Key(L"id");
+        writer.Uint(langid);    
+        writer.EndObject();
+    }
+    writer.EndArray();
 
     writer.Key(L"languages");
     writer.StartArray();
@@ -355,6 +418,12 @@ void MainWindow::loadModelData() {
     }
     writer.EndArray();
 
+    auto activeInputLang = m_model->getActiveInputLanguage();
+    if (activeInputLang) {
+        writer.Key(L"selectedInputLanguage");
+        writer.Uint(*activeInputLang);
+    }
+
     if (activeProfile) {
         writer.Key(L"selectedLanguage");
         writer.String(sys_string(uuid(*activeProfile->id).to_chars()).w_str());
@@ -376,7 +445,7 @@ void MainWindow::loadModelData() {
     
     comTest(m_webView->PostWebMessageAsJson(buffer.GetString()));
 
-    comTest(m_webView->ExecuteScript(L"document.getElementById('content').scrollHeight", 
+    comTest(m_webView->ExecuteScript(L"getDesiredSize()", 
         makeWebViewExecuteScriptCompletedHandler(
             [weakMe = get_weak_ptr()](HRESULT errorCode, LPCWSTR result) {
                 auto me = strong_cast(weakMe);
@@ -386,14 +455,16 @@ void MainWindow::loadModelData() {
                 if (errorCode != S_OK)
                     return;
 
-                wchar_t * end;
-                errno = 0;
-                auto height = wcstol(result, &end, 10);
-                if (end != result + wcslen(result) || errno)
+                rapidjson::WDocument data;
+                rapidjson::ParseResult ok = data.Parse(result);
+                if (!ok || !data.IsObject())
                     return;
-                me->m_htmlRequestedHeight = int(height);
+                const rapidjson::WValue & heightVal = data[L"height"];
+                const rapidjson::WValue & widthVal = data[L"width"];
+                me->m_htmlRequestedHeight = int(heightVal.GetInt());
+                me->m_htmlRequestedWidth = int(widthVal.GetInt());
                 auto scaling = Scaling::getCurrent(me->handle());
-                me->ensureHtmlHeight(scaling);                        
+                me->ensureHtmlSize(scaling);                        
             }
         ).get()));
     
@@ -407,11 +478,21 @@ void MainWindow::onActiveProfileChange() {
     loadModelData();
 }
 
+void MainWindow::onSelectInputLanguage(LANGID selectedLangid) {
+    for (auto langId: m_model->inputLanguages()) {
+        if (langId == selectedLangid) {
+            m_model->setActiveInputLanguage(langId);
+            break;
+        }
+    }
+}
+
 void MainWindow::onSelectLanguage(const uuid & profileId) {
 
     for(auto & profile: m_model->enabledProfiles()) {
         if (uuid(*profile.id) == profileId) {
             m_model->setActiveProfile(&profile);
+            break;
         }
     }
 }
