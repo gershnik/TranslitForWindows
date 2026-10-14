@@ -8,7 +8,7 @@
   <PropertyGroup Label="UserMacros">
     <BuildMajorVersion>1</BuildMajorVersion>
     <BuildMinorVersion>1</BuildMinorVersion>
-    <BuildPatchVersion>0</BuildPatchVersion>
+    <BuildPatchVersion>1</BuildPatchVersion>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup />
