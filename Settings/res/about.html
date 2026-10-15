@@ -6,11 +6,21 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width">
-    <meta name="viewport" content="initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
-    <meta name="supported-color-schemes" content="light dark">
     <style>
+        :root {
+            --fg-secondary: #5f5f5f;
+            --accent: #3d74e6;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --fg-secondary: #b5b5b5;
+                --accent: #7aa2f7;
+            }
+        }
+
         html {
             overflow: hidden;
         }
@@ -19,41 +29,62 @@
             margin: 0px;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             font-size: 14px;
-            -webkit-overflow-scrolling: touch;
         }
 
         #content {
-            padding: 5px;
+            padding: 16px 20px;
         }
 
-        @media (prefers-color-scheme: dark) {
-            .code-holder {
-                background-color: #292a2f;
-                padding-top: 4px;
-                padding-bottom: 4px
-            }
+        #header {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        #header img {
+            flex: none;
+            border-radius: 10%;
+        }
+
+        #name {
+            font-size: 28px;
+            font-weight: 600;
+            line-height: 1.15;
+            margin-left: -1px;
+        }
+
+        #version, #copyright {
+            margin-top: 2px;
+            padding-left: 2px;
+        }
+
+        #copyright {
+            font-size: 12px;
+            color: var(--fg-secondary);
+        }
+
+        #info {
+            margin: 16px 0 0 0;
+        }
+
+        a {
+            color: var(--accent);
         }
     </style>
 </head>
-    <body>
-        <div id="content">
-            <table style="border: 0px;margin: 0px;">
-                <tr>
-                    <td>
-                        <img width=64 height=64 style="border-radius: 10%;" src="%ICONURL%">
-                    </td>
-                    <td style="vertical-align: top;margin-left:10px">
-                        <div style="font-size: 30px;font-weight:bold;">Translit</div>
-                        <div style="font-size: 12px;">Version: %VERSION%</div>
-                        <p style="font-size: 8px;">%COPYRIGHT%</p>
-                    </td>
-                </tr>
-            </table>
+<body>
+    <div id="content">
+        <div id="header">
+            <img width="64" height="64" src="%ICONURL%" alt="">
             <div>
-                <p>
-                    More information and updates can be found at the <a href="https://github.com/gershnik/TranslitForWindows">Github homepage</a>
-                </p>
+                <div id="name">Translit</div>
+                <div id="version">Version %VERSION%</div>
+                <div id="copyright">%COPYRIGHT%</div>
             </div>
         </div>
-    </body>
+        <p id="info">
+            More information and updates can be found at the <a href="https://github.com/gershnik/TranslitForWindows">GitHub homepage</a>.
+        </p>
+    </div>
+</body>
 </html>

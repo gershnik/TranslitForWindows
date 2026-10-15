@@ -36,7 +36,7 @@ private:
 	void loadContent();
 
 private:
-	static constexpr int s_unscaledMinWidth = 465;
+	static constexpr int s_unscaledMinWidth = 400;
 	static constexpr int s_unscaledMinHeight = 180;
 
 	HWND hwndParent;
