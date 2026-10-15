@@ -56,7 +56,7 @@ To give an example, typing `privet` in Russian mode will produce `привет` 
   have one). When you click it, it should open a menu like this (assuming you selected Russian and Hebrew during the installation):
   
   <img src="doc/images/Tray.png" width="200px"><br>
-* That's pretty much it. You can now switch between English and Translit in any app using this menu or via the
+* That's pretty much it. You can now switch between normal typing and Translit in any app using this menu or via the
   `⊞ + Spacebar` key combination. 
 
 ## Configuration
