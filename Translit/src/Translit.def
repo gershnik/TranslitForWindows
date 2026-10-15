@@ -6,6 +6,8 @@ EXPORTS
 
         RegisterProfilesAction
         UnregisterProfilesAction
+        RollbackRegisterProfilesAction
+        RestoreProfilesAction
 
         getProfiles
         getProfileById

@@ -129,7 +129,7 @@ private:
 	void finishComposition(ITfContext * context);
 	void sendCompleted(ITfContext * context, const sys_string & text);
 	void sendIncomplete(ITfContext * context, const sys_string & text);
-	static sys_string virtualKeyCodeToText(UINT vcode);
+	static std::optional<sys_string> virtualKeyCodeToText(UINT vcode);
 	static bool isRangeCovered(TfEditCookie ec, SmartOrDumb<ITfRange> auto && rangeTest, SmartOrDumb<ITfRange> auto && rangeCover);
 
 private:

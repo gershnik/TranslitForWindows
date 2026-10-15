@@ -48,7 +48,7 @@ private:
 	
 	void onResize(WPARAM wParam);
 	bool onPosChanged(WINDOWPOS * pos);
-	void ensureHtmlHeight(const Scaling & scaling);
+	void ensureHtmlSize(const Scaling & scaling);
 	void onMinMaxInfo(MINMAXINFO & info);
 	void onDpiChanged(int dpi, RECT & suggestedRect);
 	void eraseBackground(HDC hdc);
@@ -57,6 +57,7 @@ private:
 	void loadModelData();
 	void onModelReload() override;
 	void onActiveProfileChange() override;
+	void onSelectInputLanguage(LANGID langid);
 	void onSelectLanguage(const uuid & profileId);
 	void onSelectMapping(int mappingIdx);
 	void onAddLanguage();
@@ -86,6 +87,7 @@ private:
 	std::unique_ptr<RegKey> m_appKey;
 	
 	int m_htmlRequestedHeight = 0;
+	int m_htmlRequestedWidth = 0;
 	int m_minWidth = s_unscaledMinWidth;
 	int m_minHeight = s_unscaledMinHeight;
 	

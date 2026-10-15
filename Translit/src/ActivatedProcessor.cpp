@@ -312,9 +312,9 @@ void ActivatedProcessor::finishComposition(ITfContext * context) {
 	
 }
 
-sys_string ActivatedProcessor::virtualKeyCodeToText(UINT vcode) {
+std::optional<sys_string> ActivatedProcessor::virtualKeyCodeToText(UINT vcode) {
 	if (vcode != VK_SPACE && (vcode < 0x30u || vcode > 0x5Au) && (vcode < VK_OEM_1 || vcode > 0xF5u))
-		return {};
+		return sys_string{};
 	UINT scanCode = MapVirtualKey(vcode, MAPVK_VK_TO_VSC);
 
 	BYTE keyboardState[256] = {'\0'};
@@ -322,14 +322,16 @@ sys_string ActivatedProcessor::virtualKeyCodeToText(UINT vcode) {
 		throwLastError();
 
 	if (keyboardState[VK_CONTROL] & BYTE(0x80))
-		return {};
+		return sys_string{};
 
 	WCHAR buf[32] = {};
 	//do not change keyboard state (Windows 10, version 1607 and newer)
 	UINT flags = (1 << 2);
 	int res = ToUnicode(vcode, scanCode, keyboardState, buf, int(std::size(buf)), flags);
 
-	return sys_string(buf, res < 0 ? -res : res);
+	if (res >= 0)
+		return sys_string(buf, res);
+	return {};
 }
 
 bool ActivatedProcessor::onKeyDown(bool preview, ITfContext * context, WPARAM wParam, [[maybe_unused]] LPARAM lParam) {
@@ -343,10 +345,13 @@ bool ActivatedProcessor::onKeyDown(bool preview, ITfContext * context, WPARAM wP
 
 	auto chars = virtualKeyCodeToText(vcode);
 #ifndef NDEBUG
-	debugPrint("Translit:  Got {} {:x},  Chars: '{}'\n", vcode, lParam, chars);
+	debugPrint("Translit:  Got {} {:x},  Chars: '{}'\n", vcode, lParam, chars ? *chars : S("<dead>"));
 #endif
 
-	if (chars.empty()) {
+	if (!chars) //dead key
+		return false;
+
+	if (chars->empty()) {
 		finishComposition(context);
 		return false;
 	}
@@ -354,13 +359,13 @@ bool ActivatedProcessor::onKeyDown(bool preview, ITfContext * context, WPARAM wP
 	if (preview)
 		return true;
 	
-	m_transliterator->append(chars);
+	m_transliterator->append(*chars);
 
 	if (!m_transliterator->matchedSomething()) {
 #ifndef NDEBUG
 		debugPrint("Translit:    Passing through\n");
 #endif
-		sendCompleted(context, chars);
+		sendCompleted(context, *chars);
 		return true;
 	}
 

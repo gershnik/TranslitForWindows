@@ -6,6 +6,7 @@
 #include <Common/err.h>
 #include <Common/RegKey.h>
 #include <Common/win32api.h>
+#include <Common/AvailableLangs.h>
 #include <Translit/Identifiers.h>
 
 
@@ -134,32 +135,103 @@ STDAPI DllCanUnloadNow() {
     return g_moduleRefCount.load() == 0 ?  S_OK : S_FALSE;
 }
 
-static void registerProfiles(const sys_string & filename, std::set<sys_string> * enabledLanguages = nullptr) {
+static AvailableLangs readRecordedInputLanguages() {
+    AvailableLangs ret;
+    std::error_code ec;
+    auto appKey = RegKey::localMachine->open(L"Software\\Translit", 0, KEY_QUERY_VALUE | KEY_WOW64_64KEY, ec);
+    if (ec)
+        return ret;
+    std::vector<wchar_t> langBuf = appKey->getMultiStringValue(L"InputLanguages", ec);
+    if (ec)
+        return ret;
+    
+    for(const wchar_t * p = langBuf.data(), * last = langBuf.data() + langBuf.size(); p != last; ++p) {
+        auto end = std::find(p, last, L'\0');
+        if (end - p != 4 || !((*p >= L'0' && *p <= L'9') || (*p >= L'A' && *p <= L'F')))
+            break;
+        wchar_t * parseEnd;
+        errno = 0;
+        unsigned long val = wcstoul(p, &parseEnd, 16);
+        if (errno || end != parseEnd || val > std::numeric_limits<LANGID>::max())
+            break;
+        ret.add(LANGID(val));
+        p = end;
+    }
+    return ret;
+}
+
+static std::set<sys_string> readRecordedEnabledLanguages() {
+    std::set<sys_string> ret;
+    std::error_code ec;
+    auto appKey = RegKey::localMachine->open(L"Software\\Translit", 0, KEY_QUERY_VALUE | KEY_WOW64_64KEY, ec);
+    if (ec)
+        return ret;
+    auto buf = appKey->getMultiStringValue(L"EnabledLanguages", ec);
+    if (ec)
+        return ret;
+    for (const wchar_t * name = buf.data(); *name; name += wcslen(name) + 1)
+        ret.insert(sys_string(name, wcslen(name)));
+    return ret;
+}
+
+static void registerProfiles(const sys_string & filename, 
+                             AvailableLangs inputLanguages = {},
+                             std::set<sys_string> * enabledLanguages = nullptr) {
     
     auto inputProcessorProfiles = comCreate<ITfInputProcessorProfiles>(CLSID_TF_InputProcessorProfiles, nullptr, CLSCTX_INPROC_SERVER);
+
+    if (inputLanguages.empty()) {
+        inputLanguages.load(inputProcessorProfiles);
+        if (inputLanguages.empty())
+            inputLanguages.add(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+    }
     
     comTest(inputProcessorProfiles->Register(g_translitServiceId));
 
-    for (auto & profile: getProfiles()) {
-        comTest(inputProcessorProfiles->AddLanguageProfile(g_translitServiceId,
-            MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-            *profile.id,
-            profile.description,
-            ULONG(-1),
-            filename.w_str(),
-            ULONG(filename.storage_size()),
-            ULONG(-profile.icondId)));
+    {
+        auto appKey = RegKey::localMachine->create(L"Software\\Translit", 0, KEY_READ | KEY_WRITE | KEY_WOW64_64KEY);
+        
+        std::wstring inputLangsValue;
+        for (auto inputLang: inputLanguages) {
+            inputLangsValue.append(std::format(L"{:04X}", unsigned(inputLang)));
+            inputLangsValue += L'\0';
+        }
+        appKey->setValue(L"InputLanguages", REG_MULTI_SZ, {LPCBYTE(inputLangsValue.c_str()), (inputLangsValue.size() + 1) * 2});
 
-        bool enabled = (enabledLanguages && enabledLanguages->contains(profile.lang));
+        std::wstring enabledLangsValue;
+        if (enabledLanguages) {
+            for (auto & lang: *enabledLanguages) {
+                if (lang.empty())
+                    continue;
+                enabledLangsValue.append(lang.w_str());
+                enabledLangsValue += L'\0';
+            }
+        }
+        appKey->setValue(L"EnabledLanguages", REG_MULTI_SZ, {LPCBYTE(enabledLangsValue.c_str()), (enabledLangsValue.size() + 1) * 2});
+    }
 
-        comTest(inputProcessorProfiles->EnableLanguageProfileByDefault(g_translitServiceId, 
-            MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-            *profile.id,
-            enabled));
-        comTest(inputProcessorProfiles->EnableLanguageProfile(g_translitServiceId, 
-            MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-            *profile.id,
-            enabled));
+    for (auto inputLang: inputLanguages) {
+        for (auto & profile: getProfiles()) {
+            comTest(inputProcessorProfiles->AddLanguageProfile(g_translitServiceId,
+                inputLang,
+                *profile.id,
+                profile.description,
+                ULONG(-1),
+                filename.w_str(),
+                ULONG(filename.storage_size()),
+                ULONG(-profile.icondId)));
+
+            bool enabled = (enabledLanguages && enabledLanguages->contains(profile.lang));
+
+            comTest(inputProcessorProfiles->EnableLanguageProfileByDefault(g_translitServiceId, 
+                inputLang,
+                *profile.id,
+                enabled));
+            comTest(inputProcessorProfiles->EnableLanguageProfile(g_translitServiceId, 
+                inputLang,
+                *profile.id,
+                enabled));
+        }
     }
 
     auto categoryMgr = comCreate<ITfCategoryMgr>(CLSID_TF_CategoryMgr, nullptr, CLSCTX_INPROC_SERVER);
@@ -169,7 +241,7 @@ static void registerProfiles(const sys_string & filename, std::set<sys_string> *
     }
 }
 
-static void unregisterProfiles() {
+static void unregisterProfiles(bool deleteRecord) {
 
     auto categoryMgr = comCreate<ITfCategoryMgr>(CLSID_TF_CategoryMgr, nullptr, CLSCTX_INPROC_SERVER);
     
@@ -181,21 +253,30 @@ static void unregisterProfiles() {
         categoryMgr->UnregisterCategory(g_translitServiceId, *cat, g_translitServiceId);
     }
 
-    for (auto & profile: getProfiles()) {
-        inputProcessorProfiles->EnableLanguageProfile(g_translitServiceId, 
-            MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-            *profile.id,
-            false);
-        inputProcessorProfiles->EnableLanguageProfileByDefault(g_translitServiceId, 
-            MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-            *profile.id,
-            false);
-        inputProcessorProfiles->RemoveLanguageProfile(g_translitServiceId, 
-            MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-            *profile.id);
+    for(auto langid: readRecordedInputLanguages()) {
+        for (auto & profile: getProfiles()) {
+            inputProcessorProfiles->EnableLanguageProfile(g_translitServiceId, 
+                langid,
+                *profile.id,
+                false);
+            inputProcessorProfiles->EnableLanguageProfileByDefault(g_translitServiceId, 
+                langid,
+                *profile.id,
+                false);
+            inputProcessorProfiles->RemoveLanguageProfile(g_translitServiceId, 
+                langid,
+                *profile.id);
+        }
     }
 
     inputProcessorProfiles->Unregister(g_translitServiceId);
+
+    if (deleteRecord) {
+        std::error_code ec;
+        auto softwareKey = RegKey::localMachine->open(L"Software", 0, KEY_ENUMERATE_SUB_KEYS | KEY_QUERY_VALUE | DELETE | KEY_WOW64_64KEY, ec);
+        if (softwareKey)
+            softwareKey->deleteTree(L"Translit", ec);
+    }
 
 }
 
@@ -221,7 +302,7 @@ STDAPI DllRegisterServer() {
 STDAPI DllUnregisterServer() {
     COM_PROLOG
 
-        unregisterProfiles();
+        unregisterProfiles(true);
         
         sys_string clsidKeyPath = S("{") + uuid(g_translitClassId).to_chars() + S("}");
 
@@ -242,11 +323,11 @@ static void msiLog(MSIHANDLE hInstall, std::format_string<Args...> fmt, Args &&.
     MsiProcessMessage(hInstall, INSTALLMESSAGE_INFO, hRecord);
 }
 
-static sys_string getMsiProperty(MSIHANDLE hInstall) {
+static sys_string getMsiProperty(MSIHANDLE hInstall, const wchar_t * name = L"CustomActionData") {
     std::vector<wchar_t> buf = {L'0'};
     for ( ; ; ) {
         auto size = DWORD(buf.size());
-        UINT res = MsiGetProperty(hInstall, L"CustomActionData", buf.data(), &size);
+        UINT res = MsiGetProperty(hInstall, name, buf.data(), &size);
         buf.resize(size + 1);
         if (res == ERROR_SUCCESS)
             break;
@@ -259,17 +340,31 @@ static sys_string getMsiProperty(MSIHANDLE hInstall) {
 extern "C" UINT __stdcall RegisterProfilesAction([[maybe_unused]] MSIHANDLE hInstall) {
     try {
         auto data = getMsiProperty(hInstall);
-        msiLog(hInstall, "Langs to enable: `{}`", data);
+        msiLog(hInstall, "Action data: `{}`", data);
+
+        // ENABLED_LANGUAGES|UserSID
+        std::vector<sys_string> parts;
+        data.split(std::back_inserter(parts), U'|', size_t(-1));
+        parts.resize(2);
 
         std::set<sys_string> enabledLanguages;
-        data.split(std::inserter(enabledLanguages, enabledLanguages.end()), U';', size_t(-1));
+        parts[0].split(std::inserter(enabledLanguages, enabledLanguages.end()), U';', size_t(-1));
+
+        AvailableLangs inputLanguages;
+        std::error_code ec;
+        if (inputLanguages.loadFromUserSid(parts[1], ec)) {
+            for (auto langId: inputLanguages)
+                msiLog(hInstall, "User language: 0x{:04X}", unsigned(langId));
+        } else {
+            msiLog(hInstall, "Cannot read languages for `{}`: {}", parts[1], ec.message());
+        }
 
         HRESULT hres = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         if (FAILED(hres) && hres != RPC_E_CHANGED_MODE)
             throwHresult(hres);
 
         auto filename = getModuleFileName(Module::handle());
-        registerProfiles(filename, &enabledLanguages);
+        registerProfiles(filename, inputLanguages, &enabledLanguages);
 
         return ERROR_SUCCESS;
 
@@ -281,23 +376,56 @@ extern "C" UINT __stdcall RegisterProfilesAction([[maybe_unused]] MSIHANDLE hIns
     return ERROR_INSTALL_FAILURE;
 }
 
-extern "C" UINT __stdcall UnregisterProfilesAction([[maybe_unused]] MSIHANDLE hInstall) {
+static UINT unregisterProfilesImpl(MSIHANDLE hInstall, bool deleteRecord, const char * name) {
     try {
+        HRESULT hres = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        if (FAILED(hres) && hres != RPC_E_CHANGED_MODE)
+            throwHresult(hres);
+
+        unregisterProfiles(deleteRecord);
+
+        return ERROR_SUCCESS;
+
+    } catch(std::system_error & ex) {
+        msiLog(hInstall, "{}: error: 0x{:08X}, {}", name, DWORD(ex.code().value()), ex.what());
+    } catch(std::exception & ex) {
+        msiLog(hInstall, "{}: error: {}", name, ex.what());
+    }
+    return ERROR_INSTALL_FAILURE;
+}
+
+// Uninstall: the record key is removed (and restored on rollback) by MSI itself
+extern "C" UINT __stdcall UnregisterProfilesAction(MSIHANDLE hInstall) {
+    return unregisterProfilesImpl(hInstall, false, "UnregisterProfilesAction");
+}
+
+// Rollback of install: the record key was created by us, so we delete it
+extern "C" UINT __stdcall RollbackRegisterProfilesAction(MSIHANDLE hInstall) {
+    return unregisterProfilesImpl(hInstall, true, "RollbackRegisterProfilesAction");
+}
+
+// Rollback of uninstall: MSI has already restored the record key; re-register exactly what it says
+extern "C" UINT __stdcall RestoreProfilesAction(MSIHANDLE hInstall) {
+    try {
+        auto inputLanguages = readRecordedInputLanguages();
+        auto enabledLanguages = readRecordedEnabledLanguages();
+        for (auto langId: inputLanguages)
+            msiLog(hInstall, "Restoring language: 0x{:04X}", unsigned(langId));
 
         HRESULT hres = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         if (FAILED(hres) && hres != RPC_E_CHANGED_MODE)
             throwHresult(hres);
 
-        unregisterProfiles();
+        auto filename = getModuleFileName(Module::handle());
+        registerProfiles(filename, inputLanguages, &enabledLanguages);
 
         return ERROR_SUCCESS;
 
     } catch(std::system_error & ex) {
-        msiLog(hInstall, "UnregisterProfilesAction: error: 0x{:08X}, {}", DWORD(ex.code().value()), ex.what());
+        msiLog(hInstall, "RestoreProfilesAction: error: 0x{:08X}, {}", DWORD(ex.code().value()), ex.what());
     } catch(std::exception & ex) {
-        msiLog(hInstall, "UnregisterProfilesAction: error: {}", ex.what());
+        msiLog(hInstall, "RestoreProfilesAction: error: {}", ex.what());
     }
     return ERROR_INSTALL_FAILURE;
-
 }
 
