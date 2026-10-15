@@ -268,9 +268,7 @@ def generate_div(config: dict[str, Any]):
             footer = footer.rstrip()
             content += dedent(f'''\
                         <div class="footer">
-                            <span>
-                                {indent_insert(footer, 32)}
-                            </span>
+                            {indent_insert(footer, 28)}
                         </div>
                         <div style="height:0.5em"></div>
             ''')
