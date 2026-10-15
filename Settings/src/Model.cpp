@@ -88,9 +88,6 @@ Model::Model() :
     
     comTest(m_threadMgr->GetGlobalCompartment(std::out_ptr(m_globalCompartments)));
 
-    //LANGID currentLangId;
-    //comTest(m_inputProfiles->GetCurrentLanguage(&currentLangId));
-
     loadData();
 }
 
@@ -144,7 +141,10 @@ void Model::loadData() {
     GUID activeProfileId;
     HRESULT hres = comTest(m_inputProfiles->GetActiveLanguageProfile(g_translitServiceId, &langId, &activeProfileId));
     if (hres == S_OK) {
-        assert(m_perInput.find(langId) != m_perInput.end());
+        if (!m_perInput.contains(langId)) {
+            assert(false);
+            m_inputLangs.add(langId);
+        }
         m_activeInputLang = langId;
     } else if (!m_inputLangs.empty()) {
         m_activeInputLang = m_inputLangs.front();
@@ -195,7 +195,7 @@ void Model::setActiveInputLanguage(LANGID langId) {
         m_activeMappingInfo.reset();
 
     for (auto listener: m_listeners)
-        listener->onModelReload(); //TODO: new event
+        listener->onModelReload();
 }
 
 void Model::setActiveProfile(const ProfileInfo * profile) {

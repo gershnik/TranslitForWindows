@@ -386,7 +386,7 @@ void MainWindow::loadModelData() {
 
     writer.Key(L"inputLanguages");
     writer.StartArray();
-    for(auto [index, langid]: std::views::enumerate(m_model->inputLanguages())) {
+    for(auto langid: m_model->inputLanguages()) {
         writer.StartObject();
         writer.Key(L"name");
         writer.String(langIdDisplayName(langid).c_str());
