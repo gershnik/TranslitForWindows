@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Fixed
+- Garbled localized input language names in Settings (by @yokoyama-midori](https://github.com/yokoyama-midori))
+
 ## [1.2] - 2026-10-17
 
 ### Added
