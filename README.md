@@ -76,7 +76,7 @@ The settings app screen looks like this:
 It shows you the letter mappings for the language and transliteration scheme selected at the top. 
 Changing the scheme makes it the default for all apps for that language.
 
-The ➕ and ➖ buttons allow you to add and remove languages. The ❓ button opens a traditional About 
+The + and - buttons allow you to add and remove languages. The ?⃝ button opens a traditional About 
 dialog.
 
 The app stays on top of other windows to allow you to see the mappings when typing in another window.
