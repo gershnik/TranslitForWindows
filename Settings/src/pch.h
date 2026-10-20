@@ -55,5 +55,5 @@ namespace rapidjson {
 	using WValue = GenericValue<UTF16<>>;
 	using WStringBuffer = GenericStringBuffer<UTF16<>>;
 	template<class Buffer>
-	using WWriter = Writer<Buffer, UTF16<>>;
+	using WWriter = Writer<Buffer, UTF16<>, UTF16<>>;
 }
