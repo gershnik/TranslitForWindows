@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Fixed
+- When pressing the `Esc` key during composition (which terminates it) the key is no longer 
+  _also_ passed to the underlying application. This makes it possible to terminate a 
+  composition without triggering the application's `Esc` actions. (by [@yokoyama-midori](https://github.com/yokoyama-midori))
+
 ## [1.2.1] - 2026-10-20
 
 ### Fixed
