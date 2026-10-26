@@ -7,8 +7,8 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
     <BuildMajorVersion>1</BuildMajorVersion>
-    <BuildMinorVersion>2</BuildMinorVersion>
-    <BuildPatchVersion>1</BuildPatchVersion>
+    <BuildMinorVersion>3</BuildMinorVersion>
+    <BuildPatchVersion>0</BuildPatchVersion>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup />

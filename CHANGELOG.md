@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+## [1.3] - 2026-10-26
+
 ### Fixed
 - When pressing the `Esc` key during composition (which terminates it) the key is no longer 
   _also_ passed to the underlying application. This makes it possible to terminate a 
@@ -52,3 +54,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 [1.1]: https://github.com/gershnik/TranslitForWindows/releases/v1.1
 [1.2]: https://github.com/gershnik/TranslitForWindows/releases/v1.2
 [1.2.1]: https://github.com/gershnik/TranslitForWindows/releases/v1.2.1
+[1.3]: https://github.com/gershnik/TranslitForWindows/releases/v1.3
