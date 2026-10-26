@@ -351,6 +351,13 @@ bool ActivatedProcessor::onKeyDown(bool preview, ITfContext * context, WPARAM wP
 	if (!chars) //dead key
 		return false;
 
+	// Commit the pending composition and consume Escape.
+	if (vcode == VK_ESCAPE && m_composition) {
+		if (!preview)
+			finishComposition(context);
+		return true;
+	}
+
 	if (chars->empty()) {
 		finishComposition(context);
 		return false;
